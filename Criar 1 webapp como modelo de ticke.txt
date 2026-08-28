@@ -1,0 +1,38 @@
+Criar 1 webapp com nome do projeto (Serviços na Torre) como modelo de ticket de atendimento e monitoramento para serviços logísticos. Este webapp deve ser compatível com todos sistemas operacionais incluindo
+ANDROID,IOS e navegador SAFARI.
+
+Sobre o webapp:
+1 - Alimentado diretamente no site (webapp Serviços na Torre) interativo e por 1 planilha formato excel;
+1a - Local da pasta onde ficarão os arquivos excel: 'C:\Users\Guilherme\OneDrive - EXPRESSO PREDILETO\Aplicativos\SOLICIT_TORRE'
+
+2 - menu principal com a lista dos serviços oriundos da planilha excel. Salvar todos os campos da planilha  em repositório
+    com nome da tabela = 'Serviços'. Incluir os campos = 'Status_monitor','Programador','Tempo_resposta1'.  nesta tabela. Campos que precisam constar na grade principal em formato de tabela na ordem:(Id do atendimento,Data de início,Tipo do serviço,Urgente,Solicitante,Local de origem,Local de destino,Percurso,Status do atendimento,STATUS_MONITOR,Programador). Os demais campos da tabela mostrar em segunda tela em ordem 'cima para baixo' e abaixo, mostrar os logs da sessão comentários.
+
+3 - menu secundário, porém precisa também constar na tela principal de forma discreta com a tabela de 'Usuários' que será
+    alimentada por 1 planilha excel;
+
+4 - menu secundário, porém precisa também constar na tela principal de forma discreta com a tabela de 'Status' que será 
+    alimentada por 1 planilha excel;
+
+Sobre a rotina do webapp:
+
+6 - A cada 30 minutos, pegar a planilha com o nome 'solicitações -crane' e atualizar ou salvar na tabela 'Serviços'. Se for incluir, salvar o serviço 
+    com o status = 'PENDENTE'. Salvar o log com a ação = 'Serviço chegou em' + data e hora locais. 
+
+7 - Se o campo = 'Programador' tiver em branco, abrir 1 banner em formato formulário na tela principal e solicitar para que
+    O Programador inclua seu nome. Buscar na tabela = 'Usuários'. Este banner deve estar sempre aparecendo na tela principal e somente ser 
+    retirado da tela com a interação do Programador. Banner retorna a tela principal a cada 5 minutos até todos os campos = 'Programador' sejam preenchidos. 
+   
+8 - Assim que o Programador incluir seu nome no(s) serviço(s) salvar 1 log com a ação: ('Solic sendo atendida por: ' + Programador ' ' + data e hora locais). 
+    automáticos e mostrar em 1 segunda tela dentro de serviço com o nome de 'Comentários'. Este setor 'Comentários' dever ser atualizado de forma automática
+    conforme o exemplo acima e ter a opção do Programador também fazer sua digitação manual. Criar este histórico junto. Pelo sistema e pelo Programador.
+    Salvar na coluna = 'Programaor_vinculado' com o valor = 'SIM' e incluir a data + hora do vinculo em outra coluna = 'Data_hora_vinculo' na mesma planilha excel.
+
+9 - Se o campo = 'Data_hora_vinculo' tiver em branco, somar a cada minuto o tempo entre os campos =  'Data de início' com 'Tempo_resposta1', transformar em 'HH:MM' e salvar no campo = 'Tempo_resposta1'.
+
+9 - Assim que o Programador atribuir seu nome e salvar, atualizar o serviço para o status = 'ABERTO'
+
+    ### aguardar próximas instruções. 
+
+
+ 
