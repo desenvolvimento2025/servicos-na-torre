@@ -116,28 +116,34 @@ iniciar_rotinas_em_background()
 # a olhar para a aba (mesmo que ela tenha ficado minimizada, em segundo
 # plano, ou o celular bloqueado por horas), a página recarrega na hora e
 # mostra os dados mais atuais — em vez de esperar até 5 minutos parada.
-st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh_5min")
+#
+# Fica dentro da barra lateral (mesmo sem UI visível ali) só para não deixar
+# "buraco" vazio acima da grade principal: cada componente invisível ainda
+# reserva um respiro mínimo no bloco onde é colocado, e a barra lateral não
+# tem relação com o espaço da tela principal.
+with st.sidebar:
+    st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh_5min")
 
-components.html(
-    """
-    <script>
-    (function() {
-        var ficouOculta = false;
-        document.addEventListener("visibilitychange", function() {
-            if (document.visibilityState === "hidden") {
-                ficouOculta = true;
-            } else if (document.visibilityState === "visible" && ficouOculta) {
-                // Recarrega a página inteira assim que o usuário volta a
-                // olhar para a aba (troca de app, minimizou, celular
-                // bloqueado etc.), garantindo dados atuais na hora.
-                window.parent.location.reload();
-            }
-        });
-    })();
-    </script>
-    """,
-    height=0,
-)
+    components.html(
+        """
+        <script>
+        (function() {
+            var ficouOculta = false;
+            document.addEventListener("visibilitychange", function() {
+                if (document.visibilityState === "hidden") {
+                    ficouOculta = true;
+                } else if (document.visibilityState === "visible" && ficouOculta) {
+                    // Recarrega a página inteira assim que o usuário volta a
+                    // olhar para a aba (troca de app, minimizou, celular
+                    // bloqueado etc.), garantindo dados atuais na hora.
+                    window.parent.location.reload();
+                }
+            });
+        })();
+        </script>
+        """,
+        height=0,
+    )
 
 if "primeira_carga_feita" not in st.session_state:
     servicos_existentes = database.listar_servicos()
@@ -229,53 +235,56 @@ mostrar_banner = bool(pendentes) and (
 # ENQUANTO o navegador/aba continuar aberto (sem estar fechado ou o
 # celular bloqueado, limitação de bateria do próprio sistema, explicada
 # antes). Guarda em localStorage os ids já notificados, para não repetir
-# a mesma notificação a cada rerun/atualização de 5 min.
-components.html(
-    f"""
-    <script>
-    (function() {{
-        const idsPendentesAgora = {json.dumps(ids_pendentes)};
-        const CHAVE = "torre_ids_ja_notificados";
+# a mesma notificação a cada rerun/atualização de 5 min. Fica na barra
+# lateral pelo mesmo motivo dos componentes acima: não empurrar a grade
+# principal para baixo com espaço vazio.
+with st.sidebar:
+    components.html(
+        f"""
+        <script>
+        (function() {{
+            const idsPendentesAgora = {json.dumps(ids_pendentes)};
+            const CHAVE = "torre_ids_ja_notificados";
 
-        function pedirPermissao() {{
-            if (window.Notification && Notification.permission !== "granted"
-                && Notification.permission !== "denied") {{
-                Notification.requestPermission();
+            function pedirPermissao() {{
+                if (window.Notification && Notification.permission !== "granted"
+                    && Notification.permission !== "denied") {{
+                    Notification.requestPermission();
+                }}
             }}
-        }}
 
-        function verificarNovosPendentes() {{
-            if (!window.Notification || Notification.permission !== "granted") return;
-            let jaNotificados = [];
-            try {{
-                jaNotificados = JSON.parse(window.parent.localStorage.getItem(CHAVE) || "[]");
-            }} catch (e) {{ jaNotificados = []; }}
-            const novos = idsPendentesAgora.filter(id => !jaNotificados.includes(id));
-            if (novos.length > 0) {{
-                new Notification("🗼 Serviços na Torre", {{
-                    body: novos.length === 1
-                        ? `Serviço ${{novos[0]}} está aguardando um Programador.`
-                        : `${{novos.length}} serviços novos aguardando um Programador.`,
-                    tag: "torre-pendentes",
-                }});
+            function verificarNovosPendentes() {{
+                if (!window.Notification || Notification.permission !== "granted") return;
+                let jaNotificados = [];
+                try {{
+                    jaNotificados = JSON.parse(window.parent.localStorage.getItem(CHAVE) || "[]");
+                }} catch (e) {{ jaNotificados = []; }}
+                const novos = idsPendentesAgora.filter(id => !jaNotificados.includes(id));
+                if (novos.length > 0) {{
+                    new Notification("🗼 Serviços na Torre", {{
+                        body: novos.length === 1
+                            ? `Serviço ${{novos[0]}} está aguardando um Programador.`
+                            : `${{novos.length}} serviços novos aguardando um Programador.`,
+                        tag: "torre-pendentes",
+                    }});
+                }}
+                try {{
+                    window.parent.localStorage.setItem(
+                        CHAVE, JSON.stringify(idsPendentesAgora)
+                    );
+                }} catch (e) {{}}
             }}
-            try {{
-                window.parent.localStorage.setItem(
-                    CHAVE, JSON.stringify(idsPendentesAgora)
-                );
-            }} catch (e) {{}}
-        }}
 
-        // Expõe um botão global "Ativar notificações" (criado pelo Python
-        // logo abaixo) para pedir a permissão com um clique real do
-        // usuário — a maioria dos navegadores exige isso.
-        window.parent.__torreAtivarNotificacoes = pedirPermissao;
-        verificarNovosPendentes();
-    }})();
-    </script>
-    """,
-    height=0,
-)
+            // Expõe um botão global "Ativar notificações" (criado pelo Python
+            // logo abaixo) para pedir a permissão com um clique real do
+            // usuário — a maioria dos navegadores exige isso.
+            window.parent.__torreAtivarNotificacoes = pedirPermissao;
+            verificarNovosPendentes();
+        }})();
+        </script>
+        """,
+        height=0,
+    )
 
 if modo_banner:
     st.markdown('<span class="torre-titulo">🔔 Aviso de vínculo — Serviços na Torre</span>', unsafe_allow_html=True)
@@ -339,7 +348,11 @@ if mostrar_banner:
             )
             st.rerun()
 
-st.divider()
+# O divisor só aparece junto com o banner (separando aviso da grade). Sem
+# vínculo pendente (ou banner fechado por 5 min), não faz sentido reservar
+# essa linha/espaço — a grade de Serviços sobe e ocupa a tela toda.
+if mostrar_banner:
+    st.divider()
 
 # ---------------------------------------------------------------------------
 # Segunda tela: todos os demais dados do serviço (as ~80 colunas do Koepe
