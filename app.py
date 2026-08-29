@@ -17,7 +17,7 @@ import pandas as pd
 import streamlit as st
 from streamlit_autorefresh import st_autorefresh
 
-from src import config, database
+from src import config, database, tempo
 from src.scheduler import iniciar_rotinas_em_background
 
 st.set_page_config(
@@ -89,7 +89,7 @@ def _tempo_sem_vinculo(criado_em_str):
         criado_em = datetime.strptime(criado_em_str, "%Y-%m-%d %H:%M:%S")
     except ValueError:
         return "?"
-    total_min = max(int((datetime.now() - criado_em).total_seconds() // 60), 0)
+    total_min = max(int((tempo.agora() - criado_em).total_seconds() // 60), 0)
     horas, minutos = divmod(total_min, 60)
     return f"{horas}h {minutos:02d}min"
 
@@ -162,7 +162,7 @@ with st.sidebar:
 # Banner: serviços sem Programador vinculado (item 7)
 # ---------------------------------------------------------------------------
 pendentes = database.servicos_sem_programador()
-agora = datetime.now()
+agora = tempo.agora()
 mostrar_banner = bool(pendentes) and (
     st.session_state["banner_dismissed_until"] is None
     or agora >= st.session_state["banner_dismissed_until"]

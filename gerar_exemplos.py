@@ -16,13 +16,17 @@ de rodar:
     set SERVICOS_TORRE_PASTA=%cd%\\data\\entrada        (cmd do Windows)
 """
 import os
-from datetime import datetime, timedelta
+import sys
+from datetime import timedelta
 import pandas as pd
+
+sys.path.insert(0, os.path.dirname(__file__))
+from src import tempo  # noqa: E402  (horário de Brasília, ver src/tempo.py)
 
 BASE = os.path.join(os.path.dirname(__file__), "data", "entrada")
 os.makedirs(BASE, exist_ok=True)
 
-agora = datetime.now()
+agora = tempo.agora()
 
 
 def fmt(dt):

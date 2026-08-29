@@ -18,7 +18,7 @@ from datetime import datetime
 
 import pandas as pd
 
-from . import config
+from . import config, tempo
 
 _SCHEMA = """
 CREATE TABLE IF NOT EXISTS servicos (
@@ -101,7 +101,7 @@ def init_db():
 
 
 def _now_str():
-    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    return tempo.agora().strftime("%Y-%m-%d %H:%M:%S")
 
 
 def add_comentario(conn, servico_id, autor, texto, tipo="automatico"):
@@ -445,7 +445,7 @@ def recalcular_tempo_resposta():
                 inicio = pd.to_datetime(row["data_inicio"], dayfirst=True)
             except Exception:
                 continue
-            delta = datetime.now() - inicio.to_pydatetime()
+            delta = tempo.agora() - inicio.to_pydatetime()
             total_min = max(int(delta.total_seconds() // 60), 0)
             horas, minutos = divmod(total_min, 60)
             tempo_fmt = f"{horas:02d}:{minutos:02d}"
