@@ -94,10 +94,30 @@ def _migrar_colunas_novas(conn):
         conn.execute("ALTER TABLE servicos ADD COLUMN filial_programador TEXT")
 
 
+def _backfill_filial_programador(conn):
+    """Preenche retroativamente a Filial do Programador para serviços que já
+    tinham um programador vinculado ANTES desta coluna existir no código
+    (ou que ficaram sem filial por qualquer outro motivo). Não sobrescreve
+    valores já preenchidos, e só preenche quando o programador em questão
+    tem uma filial cadastrada na tabela de usuários."""
+    conn.execute(
+        """UPDATE servicos SET filial_programador = (
+            SELECT filial FROM usuarios WHERE usuarios.nome = servicos.programador
+        )
+        WHERE programador IS NOT NULL AND programador != ''
+          AND (filial_programador IS NULL OR filial_programador = '')
+          AND EXISTS (
+              SELECT 1 FROM usuarios
+              WHERE usuarios.nome = servicos.programador AND usuarios.filial IS NOT NULL
+          )"""
+    )
+
+
 def init_db():
     with get_connection() as conn:
         conn.executescript(_SCHEMA)
         _migrar_colunas_novas(conn)
+        _backfill_filial_programador(conn)
 
 
 def _now_str():
@@ -245,6 +265,7 @@ def import_usuarios_excel(caminho=None):
                     campos.get("grupo"), campos.get("eh_programador"),
                 ),
             )
+        _backfill_filial_programador(conn)
 
 
 def import_status_excel(caminho=None):
