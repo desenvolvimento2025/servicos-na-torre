@@ -11,6 +11,7 @@ src/config.py). Para testar com dados fictícios em vez da pasta real,
 rode antes "python gerar_exemplos.py" e defina a variável de ambiente
 SERVICOS_TORRE_PASTA apontando para a pasta data/entrada (ver README.md).
 """
+import json
 from datetime import datetime, timedelta
 
 import pandas as pd
@@ -153,54 +154,140 @@ if "usuario_atual" not in st.session_state:
 if "ver_detalhe_completo" not in st.session_state:
     st.session_state["ver_detalhe_completo"] = None
 
+# Modo "somente banner" (?modo=banner na URL): uma cópia interativa, idêntica
+# em funcionamento, mostrando SÓ o aviso de vínculo — pensada para abrir numa
+# janela/aba separada (computador ou celular) e deixar sempre visível, já
+# que não é possível um site "puxar" sozinho a janela principal para a
+# frente da tela (bloqueio de segurança de todo navegador).
+modo_banner = st.query_params.get("modo") == "banner"
+
+nomes_programadores = [u["nome"] for u in database.listar_programadores()]
 
 # ---------------------------------------------------------------------------
 # Barra lateral: identificação do Programador + menus discretos (itens 3 e 4)
 # ---------------------------------------------------------------------------
-with st.sidebar:
-    st.markdown('<span class="torre-titulo">🗼 Serviços na Torre</span>', unsafe_allow_html=True)
+if not modo_banner:
+    with st.sidebar:
+        st.markdown('<span class="torre-titulo">🗼 Serviços na Torre</span>', unsafe_allow_html=True)
 
-    usuarios = database.listar_usuarios()
-    programadores = database.listar_programadores()
-    nomes_programadores = [u["nome"] for u in programadores]
-    st.session_state["usuario_atual"] = st.selectbox(
-        "Quem é você?",
-        options=["—"] + nomes_programadores,
-        index=0 if not st.session_state["usuario_atual"]
-        else (["—"] + nomes_programadores).index(st.session_state["usuario_atual"]),
-        help="Sem login por enquanto — qualquer pessoa pode abrir o webapp. "
-        "Selecione seu nome apenas para identificar seus comentários e vínculos. "
-        "Lista filtrada pela coluna PROGRAMADOR = SIM da planilha de Usuários.",
-    )
+        usuarios = database.listar_usuarios()
+        st.session_state["usuario_atual"] = st.selectbox(
+            "Quem é você?",
+            options=["—"] + nomes_programadores,
+            index=0 if not st.session_state["usuario_atual"]
+            else (["—"] + nomes_programadores).index(st.session_state["usuario_atual"]),
+            help="Sem login por enquanto — qualquer pessoa pode abrir o webapp. "
+            "Selecione seu nome apenas para identificar seus comentários e vínculos. "
+            "Lista filtrada pela coluna PROGRAMADOR = SIM da planilha de Usuários.",
+        )
 
-    if st.button("🔄 Importar planilhas agora", use_container_width=True):
-        resultado = database.importar_tudo()
-        st.success(f"Importado: {resultado['novos']} novo(s), {resultado['atualizados']} atualizado(s).")
-        st.rerun()
+        if st.button("🔄 Importar planilhas agora", use_container_width=True):
+            resultado = database.importar_tudo()
+            st.success(f"Importado: {resultado['novos']} novo(s), {resultado['atualizados']} atualizado(s).")
+            st.rerun()
 
-    st.divider()
+        st.divider()
 
-    # Menus secundários (itens 3 e 4) — sempre ocultos/recolhidos ao abrir
-    # o webapp; só abrem se o usuário clicar.
-    with st.expander(f"👤 Usuários ({len(usuarios)})", expanded=False):
-        st.dataframe(pd.DataFrame(usuarios), hide_index=True, use_container_width=True, height=250)
+        # Menus secundários (itens 3 e 4) — sempre ocultos/recolhidos ao abrir
+        # o webapp; só abrem se o usuário clicar.
+        with st.expander(f"👤 Usuários ({len(usuarios)})", expanded=False):
+            st.dataframe(pd.DataFrame(usuarios), hide_index=True, use_container_width=True, height=250)
 
-    with st.expander("🏷️ Status", expanded=False):
-        st.dataframe(pd.DataFrame(database.listar_status()), hide_index=True, use_container_width=True)
+        with st.expander("🏷️ Status", expanded=False):
+            st.dataframe(pd.DataFrame(database.listar_status()), hide_index=True, use_container_width=True)
 
-    st.caption(
-        "Fonte dos dados (planilhas Excel): \n\n" + config.PASTA_PLANILHAS
-    )
+        st.caption(
+            "Fonte dos dados (planilhas Excel): \n\n" + config.PASTA_PLANILHAS
+        )
+
+        st.divider()
+        st.markdown(
+            '<a href="?modo=banner" target="_blank">🔔 Abrir aviso de vínculo em janela separada</a>',
+            unsafe_allow_html=True,
+        )
+        st.caption(
+            "Abre uma cópia só com o aviso de serviço sem Programador, para "
+            "deixar fixada numa outra janela/aba (computador ou celular)."
+        )
 
 # ---------------------------------------------------------------------------
 # Banner: serviços sem Programador vinculado (item 7)
 # ---------------------------------------------------------------------------
 pendentes = database.servicos_sem_programador()
+ids_pendentes = [p["id_atendimento"] for p in pendentes]
 agora = tempo.agora()
 mostrar_banner = bool(pendentes) and (
     st.session_state["banner_dismissed_until"] is None
     or agora >= st.session_state["banner_dismissed_until"]
 )
+
+# Notificação nativa do navegador (fora da aba/janela) quando surge um
+# serviço NOVO sem Programador — o mais perto que dá de "trazer para a
+# frente da tela" sem depender do usuário estar olhando para a aba: o
+# navegador desenha esse aviso por cima de qualquer outro programa aberto
+# no computador, e no celular ele aparece na barra de notificações,
+# ENQUANTO o navegador/aba continuar aberto (sem estar fechado ou o
+# celular bloqueado, limitação de bateria do próprio sistema, explicada
+# antes). Guarda em localStorage os ids já notificados, para não repetir
+# a mesma notificação a cada rerun/atualização de 5 min.
+components.html(
+    f"""
+    <script>
+    (function() {{
+        const idsPendentesAgora = {json.dumps(ids_pendentes)};
+        const CHAVE = "torre_ids_ja_notificados";
+
+        function pedirPermissao() {{
+            if (window.Notification && Notification.permission !== "granted"
+                && Notification.permission !== "denied") {{
+                Notification.requestPermission();
+            }}
+        }}
+
+        function verificarNovosPendentes() {{
+            if (!window.Notification || Notification.permission !== "granted") return;
+            let jaNotificados = [];
+            try {{
+                jaNotificados = JSON.parse(window.parent.localStorage.getItem(CHAVE) || "[]");
+            }} catch (e) {{ jaNotificados = []; }}
+            const novos = idsPendentesAgora.filter(id => !jaNotificados.includes(id));
+            if (novos.length > 0) {{
+                new Notification("🗼 Serviços na Torre", {{
+                    body: novos.length === 1
+                        ? `Serviço ${{novos[0]}} está aguardando um Programador.`
+                        : `${{novos.length}} serviços novos aguardando um Programador.`,
+                    tag: "torre-pendentes",
+                }});
+            }}
+            try {{
+                window.parent.localStorage.setItem(
+                    CHAVE, JSON.stringify(idsPendentesAgora)
+                );
+            }} catch (e) {{}}
+        }}
+
+        // Expõe um botão global "Ativar notificações" (criado pelo Python
+        // logo abaixo) para pedir a permissão com um clique real do
+        // usuário — a maioria dos navegadores exige isso.
+        window.parent.__torreAtivarNotificacoes = pedirPermissao;
+        verificarNovosPendentes();
+    }})();
+    </script>
+    """,
+    height=0,
+)
+
+if modo_banner:
+    st.markdown('<span class="torre-titulo">🔔 Aviso de vínculo — Serviços na Torre</span>', unsafe_allow_html=True)
+    st.markdown(
+        """
+        <button onclick="window.__torreAtivarNotificacoes && window.__torreAtivarNotificacoes()"
+        style="margin-bottom:0.75rem;">🔔 Ativar notificações do navegador</button>
+        """,
+        unsafe_allow_html=True,
+    )
+    if not pendentes:
+        st.success("✅ Nenhum serviço aguardando Programador no momento.")
 
 if mostrar_banner:
     with st.container(border=True):
@@ -208,7 +295,6 @@ if mostrar_banner:
             f"⚠️ Há {len(pendentes)} serviço(s) aguardando um Programador. "
             "Este aviso volta a aparecer a cada 5 minutos até todos serem preenchidos."
         )
-        ids_pendentes = [p["id_atendimento"] for p in pendentes]
 
         # Se acabamos de excluir um vínculo, o serviço que virou pendente
         # agora pode não ser o mesmo que já estava escolhido neste combo
