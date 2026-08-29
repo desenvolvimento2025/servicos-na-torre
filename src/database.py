@@ -345,6 +345,35 @@ def vincular_programador(id_atendimento, programador):
         )
 
 
+def reverter_vinculo(id_atendimento):
+    """Reverte o vínculo do Programador com o serviço: remove o Programador,
+    volta STATUS_MONITOR para PENDENTE (o serviço reaparece no banner de
+    'aguardando Programador') e limpa data_hora_vinculo (o cálculo de tempo
+    de resposta volta a rodar sozinho, como se ainda não tivesse sido
+    atendido). Usado tanto para excluir o vínculo quanto como primeiro passo
+    para trocar de Programador (depois é só vincular outro nome normalmente).
+    Grava um log automático em Comentários com o nome de quem estava
+    vinculado antes da reversão."""
+    agora = _now_str()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT programador FROM servicos WHERE id_atendimento = ?",
+            (id_atendimento,),
+        ).fetchone()
+        programador_anterior = (row["programador"] if row else None) or "(sem nome)"
+        conn.execute(
+            """UPDATE servicos SET
+                programador=NULL, programador_vinculado='NAO', data_hora_vinculo=NULL,
+                status_monitor='PENDENTE', atualizado_em=?
+            WHERE id_atendimento=?""",
+            (agora, id_atendimento),
+        )
+        add_comentario(
+            conn, id_atendimento, "Sistema", tipo="automatico",
+            texto=f"Vínculo com {programador_anterior} revertido em {agora}",
+        )
+
+
 def adicionar_comentario_manual(id_atendimento, autor, texto):
     with get_connection() as conn:
         add_comentario(conn, id_atendimento, autor, texto=texto, tipo="manual")

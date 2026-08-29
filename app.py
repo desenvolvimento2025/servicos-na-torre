@@ -340,9 +340,19 @@ else:
                             database.vincular_programador(id_sel, programador_escolhido)
                             st.rerun()
                 else:
-                    st.caption(
-                        f"Vinculado a **{servico['programador']}** em {servico.get('data_hora_vinculo') or ''}."
-                    )
+                    col_cap, col_reverter = st.columns([4, 2])
+                    with col_cap:
+                        st.caption(
+                            f"Vinculado a **{servico['programador']}** em {servico.get('data_hora_vinculo') or ''}."
+                        )
+                    with col_reverter:
+                        if st.button(
+                            "🔁 Reverter vínculo (excluir/trocar)",
+                            key=f"reverter_vinculo_{id_sel}",
+                            use_container_width=True,
+                        ):
+                            database.reverter_vinculo(id_sel)
+                            st.rerun()
 
                 # Histórico de Comentários — mais recente primeiro, só o
                 # texto do histórico, 1 linha por comentário (sem ícone,
