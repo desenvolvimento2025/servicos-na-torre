@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
+from streamlit_autorefresh import st_autorefresh
 
 from src import config, database
 from src.scheduler import iniciar_rotinas_em_background
@@ -96,6 +97,12 @@ def _tempo_sem_vinculo(criado_em_str):
 # Inicialização (idempotente a cada rerun do Streamlit)
 # ---------------------------------------------------------------------------
 iniciar_rotinas_em_background()
+
+# Atualiza a tela sozinha a cada 5 minutos (sem precisar apertar F5). Como a
+# importação das planilhas roda em background a cada 30 minutos (múltiplo de
+# 5), cada atualização automática já reflete os dados mais recentes assim
+# que a importação seguinte acontecer.
+st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh_5min")
 
 if "primeira_carga_feita" not in st.session_state:
     servicos_existentes = database.listar_servicos()
