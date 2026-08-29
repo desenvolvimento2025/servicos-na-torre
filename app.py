@@ -301,6 +301,13 @@ else:
     else:
         st.session_state["servico_selecionado"] = None
 
+    # Depois de reverter um vínculo, mantém a janela do MESMO serviço aberta
+    # (não depende da grade ter guardado a seleção) — assim o formulário
+    # para vincular o novo Programador já aparece na hora, sem precisar
+    # procurar o serviço certo em meio a outros pendentes.
+    if st.session_state.get("manter_aberto_apos_reverter") is not None:
+        st.session_state["servico_selecionado"] = st.session_state.pop("manter_aberto_apos_reverter")
+
     if st.session_state["servico_selecionado"] is not None:
         id_sel = st.session_state["servico_selecionado"]
         servico, comentarios = database.obter_servico(id_sel)
@@ -352,6 +359,7 @@ else:
                             use_container_width=True,
                         ):
                             database.reverter_vinculo(id_sel)
+                            st.session_state["manter_aberto_apos_reverter"] = id_sel
                             st.rerun()
 
                 # Histórico de Comentários — mais recente primeiro, só o
