@@ -175,6 +175,18 @@ if mostrar_banner:
             "Este aviso volta a aparecer a cada 5 minutos até todos serem preenchidos."
         )
         ids_pendentes = [p["id_atendimento"] for p in pendentes]
+
+        # Se acabamos de reverter um vínculo, o serviço que virou pendente
+        # agora pode não ser o mesmo que já estava escolhido neste combo
+        # (que guarda a última seleção). Sem isso, o primeiro clique em
+        # "Vincular" aqui podia acabar vinculando OUTRO serviço da lista,
+        # dando a impressão de que a ação "não colou" da primeira vez.
+        # Por isso, força o combo a já vir com o serviço recém-revertido
+        # selecionado.
+        alvo_recente = st.session_state.get("manter_aberto_apos_reverter")
+        if alvo_recente in ids_pendentes:
+            st.session_state["banner_servico"] = alvo_recente
+
         col1, col2, col3 = st.columns([4, 2, 1])
         with col1:
             def _rotulo_servico_pendente(i):
