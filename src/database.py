@@ -124,6 +124,36 @@ def _now_str():
     return tempo.agora().strftime("%Y-%m-%d %H:%M:%S")
 
 
+def _fmt_sem_segundos(data_hora_str):
+    """Formata um datetime armazenado (AAAA-MM-DD HH:MM:SS) para exibição
+    em pt-BR SEM os segundos: DD/MM/AAAA HH:MM. Usado nas mensagens
+    automáticas do histórico de Comentários (item pedido pelo usuário)."""
+    if not data_hora_str:
+        return ""
+    try:
+        dt = datetime.strptime(data_hora_str, "%Y-%m-%d %H:%M:%S")
+    except (TypeError, ValueError):
+        return data_hora_str
+    return dt.strftime("%d/%m/%Y %H:%M")
+
+
+def formatar_duracao(delta_segundos):
+    """Formata uma duração em segundos como 'Xd Xh Ymin' (só mostra dias/horas
+    quando existem). Usado para medir o tempo entre um comentário e outro no
+    histórico de Comentários."""
+    delta_segundos = max(int(delta_segundos), 0)
+    dias, resto = divmod(delta_segundos, 86400)
+    horas, resto = divmod(resto, 3600)
+    minutos, _ = divmod(resto, 60)
+    partes = []
+    if dias:
+        partes.append(f"{dias}d")
+    if dias or horas:
+        partes.append(f"{horas}h")
+    partes.append(f"{minutos}min")
+    return " ".join(partes)
+
+
 def add_comentario(conn, servico_id, autor, texto, tipo="automatico"):
     conn.execute(
         "INSERT INTO comentarios (servico_id, data_hora, autor, tipo, texto) "
@@ -207,7 +237,7 @@ def import_servicos_excel(caminho=None):
                 )
                 add_comentario(
                     conn, id_atendimento, "Sistema", tipo="automatico",
-                    texto=f"Serviço chegou em {_now_str()}",
+                    texto=f"Serviço chegou em {_fmt_sem_segundos(_now_str())}",
                 )
                 novos += 1
             else:
@@ -384,7 +414,7 @@ def vincular_programador(id_atendimento, programador):
         )
         add_comentario(
             conn, id_atendimento, "Sistema", tipo="automatico",
-            texto=f"Solic sendo atendida por: {programador} {agora}",
+            texto=f"Solic sendo atendida por: {programador} {_fmt_sem_segundos(agora)}",
         )
 
 
@@ -413,7 +443,7 @@ def reverter_vinculo(id_atendimento):
         )
         add_comentario(
             conn, id_atendimento, "Sistema", tipo="automatico",
-            texto=f"Vínculo com {programador_anterior} revertido em {agora}",
+            texto=f"Vínculo com {programador_anterior} revertido em {_fmt_sem_segundos(agora)}",
         )
 
 
@@ -439,7 +469,7 @@ def trocar_programador(id_atendimento, novo_programador):
         )
         add_comentario(
             conn, id_atendimento, "Sistema", tipo="automatico",
-            texto=f"Programador alterado de {programador_anterior} para {novo_programador} em {agora}",
+            texto=f"Programador alterado de {programador_anterior} para {novo_programador} em {_fmt_sem_segundos(agora)}",
         )
 
 

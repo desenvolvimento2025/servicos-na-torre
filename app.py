@@ -391,10 +391,24 @@ else:
 
                 # Histórico de Comentários — mais recente primeiro, só o
                 # texto do histórico, 1 linha por comentário (sem ícone,
-                # autor ou timestamp separados).
+                # autor ou timestamp separados). Abaixo de cada um (exceto o
+                # mais antigo) mostramos o tempo decorrido até o comentário
+                # anterior, para medirmos o intervalo entre interações.
                 st.markdown(f"###### 💬 Comentários ({len(comentarios)})")
-                for c in comentarios:
+                for i, c in enumerate(comentarios):
                     st.text(c["texto"])
+                    if i + 1 < len(comentarios):
+                        try:
+                            data_atual = datetime.strptime(c["data_hora"], "%Y-%m-%d %H:%M:%S")
+                            data_anterior = datetime.strptime(
+                                comentarios[i + 1]["data_hora"], "%Y-%m-%d %H:%M:%S"
+                            )
+                            duracao = database.formatar_duracao(
+                                (data_atual - data_anterior).total_seconds()
+                            )
+                            st.caption(f"⏱️ {duracao} desde o comentário anterior")
+                        except (TypeError, ValueError):
+                            pass
 
                 autor_atual = st.session_state["usuario_atual"] or "Usuário"
                 novo_comentario = st.text_area("Adicionar comentário manual", key=f"comentario_{id_sel}")
