@@ -15,6 +15,7 @@ from datetime import datetime, timedelta
 
 import pandas as pd
 import streamlit as st
+import streamlit.components.v1 as components
 from streamlit_autorefresh import st_autorefresh
 
 from src import config, database, tempo
@@ -102,7 +103,40 @@ iniciar_rotinas_em_background()
 # importação das planilhas roda em background a cada 30 minutos (múltiplo de
 # 5), cada atualização automática já reflete os dados mais recentes assim
 # que a importação seguinte acontecer.
+#
+# IMPORTANTE (limitação do navegador, não do app): este timer de 5 min só
+# "tique-taca" enquanto a aba está em primeiro plano. Todo navegador
+# (Chrome, Edge, Safari, e principalmente no celular) pausa/limita
+# JavaScript de abas em segundo plano ou com a tela bloqueada, para
+# economizar bateria — isso vale para qualquer site, não só para este app,
+# e não existe código que contorne isso. Os dados no servidor continuam
+# sendo importados a cada 30 min mesmo sem ninguém com a tela aberta (ver
+# src/scheduler.py); o que garantimos aqui é que, assim que a pessoa VOLTAR
+# a olhar para a aba (mesmo que ela tenha ficado minimizada, em segundo
+# plano, ou o celular bloqueado por horas), a página recarrega na hora e
+# mostra os dados mais atuais — em vez de esperar até 5 minutos parada.
 st_autorefresh(interval=5 * 60 * 1000, key="auto_refresh_5min")
+
+components.html(
+    """
+    <script>
+    (function() {
+        var ficouOculta = false;
+        document.addEventListener("visibilitychange", function() {
+            if (document.visibilityState === "hidden") {
+                ficouOculta = true;
+            } else if (document.visibilityState === "visible" && ficouOculta) {
+                // Recarrega a página inteira assim que o usuário volta a
+                // olhar para a aba (troca de app, minimizou, celular
+                // bloqueado etc.), garantindo dados atuais na hora.
+                window.parent.location.reload();
+            }
+        });
+    })();
+    </script>
+    """,
+    height=0,
+)
 
 if "primeira_carga_feita" not in st.session_state:
     servicos_existentes = database.listar_servicos()
