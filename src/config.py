@@ -92,6 +92,7 @@ COLUNAS_GRADE_PRINCIPAL = [
     ("status_atendimento", "Status do atendimento"),
     ("status_monitor", "STATUS_MONITOR"),
     ("programador", "Programador"),
+    ("filial_programador", "Filial"),
 ]
 
 # Planilha real: aba "Usuários", colunas NOME, E-MAIL, CPF, TELEFONE,

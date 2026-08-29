@@ -38,6 +38,7 @@ CREATE TABLE IF NOT EXISTS servicos (
     status_atendimento TEXT,        -- controlado pelo webapp (PENDENTE / ABERTO / ...)
     status_monitor TEXT,
     programador TEXT,
+    filial_programador TEXT,        -- FILIAL do Programador vinculado (da planilha de Usuários)
     tempo_resposta1 TEXT,
     programador_vinculado TEXT DEFAULT 'NAO',
     data_hora_vinculo TEXT,
@@ -84,9 +85,19 @@ def get_connection():
         conn.close()
 
 
+def _migrar_colunas_novas(conn):
+    """Adiciona colunas novas em bancos já existentes (criados antes desta
+    coluna existir), já que 'CREATE TABLE IF NOT EXISTS' não altera uma
+    tabela que já existe."""
+    colunas_existentes = {row["name"] for row in conn.execute("PRAGMA table_info(servicos)")}
+    if "filial_programador" not in colunas_existentes:
+        conn.execute("ALTER TABLE servicos ADD COLUMN filial_programador TEXT")
+
+
 def init_db():
     with get_connection() as conn:
         conn.executescript(_SCHEMA)
+        _migrar_colunas_novas(conn)
 
 
 def _now_str():
@@ -325,19 +336,30 @@ def servicos_sem_programador():
 # ---------------------------------------------------------------------------
 # Regras de negócio (itens 7, 8 e 9 do documento)
 # ---------------------------------------------------------------------------
+def _filial_do_programador(conn, programador):
+    """Busca a FILIAL do Programador na tabela de Usuários (planilha
+    Usuarios.xlsx), para gravar junto no serviço vinculado."""
+    row = conn.execute(
+        "SELECT filial FROM usuarios WHERE nome = ?", (programador,)
+    ).fetchone()
+    return row["filial"] if row else None
+
+
 def vincular_programador(id_atendimento, programador):
     """Item 8/9: vincula um Programador ao serviço, grava log automático,
-    marca programador_vinculado=SIM, grava data_hora_vinculo e muda o
-    STATUS_MONITOR (o status controlado pelo webapp, separado do 'Status
-    do atendimento' original do Koepe) para ABERTO."""
+    marca programador_vinculado=SIM, grava data_hora_vinculo, copia a
+    FILIAL do Programador (planilha de Usuários) e muda o STATUS_MONITOR
+    (o status controlado pelo webapp, separado do 'Status do atendimento'
+    original do Koepe) para ABERTO."""
     agora = _now_str()
     with get_connection() as conn:
+        filial = _filial_do_programador(conn, programador)
         conn.execute(
             """UPDATE servicos SET
-                programador=?, programador_vinculado='SIM', data_hora_vinculo=?,
-                status_monitor='ABERTO', atualizado_em=?
+                programador=?, filial_programador=?, programador_vinculado='SIM',
+                data_hora_vinculo=?, status_monitor='ABERTO', atualizado_em=?
             WHERE id_atendimento=?""",
-            (programador, agora, agora, id_atendimento),
+            (programador, filial, agora, agora, id_atendimento),
         )
         add_comentario(
             conn, id_atendimento, "Sistema", tipo="automatico",
@@ -363,8 +385,8 @@ def reverter_vinculo(id_atendimento):
         programador_anterior = (row["programador"] if row else None) or "(sem nome)"
         conn.execute(
             """UPDATE servicos SET
-                programador=NULL, programador_vinculado='NAO', data_hora_vinculo=NULL,
-                status_monitor='PENDENTE', atualizado_em=?
+                programador=NULL, filial_programador=NULL, programador_vinculado='NAO',
+                data_hora_vinculo=NULL, status_monitor='PENDENTE', atualizado_em=?
             WHERE id_atendimento=?""",
             (agora, id_atendimento),
         )
@@ -380,8 +402,8 @@ def trocar_programador(id_atendimento, novo_programador):
     todo (não dispara o banner de 'aguardando Programador'), e
     data_hora_vinculo não é alterada — a métrica de tempo de resposta do
     primeiro atendimento não deve mudar só porque o responsável foi
-    trocado depois. Grava um log automático em Comentários com o nome
-    anterior e o novo."""
+    trocado depois. Atualiza também a FILIAL para a do novo Programador.
+    Grava um log automático em Comentários com o nome anterior e o novo."""
     agora = _now_str()
     with get_connection() as conn:
         row = conn.execute(
@@ -389,9 +411,10 @@ def trocar_programador(id_atendimento, novo_programador):
             (id_atendimento,),
         ).fetchone()
         programador_anterior = (row["programador"] if row else None) or "(sem nome)"
+        filial = _filial_do_programador(conn, novo_programador)
         conn.execute(
-            "UPDATE servicos SET programador=?, atualizado_em=? WHERE id_atendimento=?",
-            (novo_programador, agora, id_atendimento),
+            "UPDATE servicos SET programador=?, filial_programador=?, atualizado_em=? WHERE id_atendimento=?",
+            (novo_programador, filial, agora, id_atendimento),
         )
         add_comentario(
             conn, id_atendimento, "Sistema", tipo="automatico",
