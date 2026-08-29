@@ -176,14 +176,14 @@ if mostrar_banner:
         )
         ids_pendentes = [p["id_atendimento"] for p in pendentes]
 
-        # Se acabamos de reverter um vínculo, o serviço que virou pendente
+        # Se acabamos de excluir um vínculo, o serviço que virou pendente
         # agora pode não ser o mesmo que já estava escolhido neste combo
         # (que guarda a última seleção). Sem isso, o primeiro clique em
         # "Vincular" aqui podia acabar vinculando OUTRO serviço da lista,
         # dando a impressão de que a ação "não colou" da primeira vez.
-        # Por isso, força o combo a já vir com o serviço recém-revertido
+        # Por isso, força o combo a já vir com o serviço recém-excluído
         # selecionado.
-        alvo_recente = st.session_state.get("manter_aberto_apos_reverter")
+        alvo_recente = st.session_state.get("manter_selecionado_apos_acao")
         if alvo_recente in ids_pendentes:
             st.session_state["banner_servico"] = alvo_recente
 
@@ -313,12 +313,12 @@ else:
     else:
         st.session_state["servico_selecionado"] = None
 
-    # Depois de reverter um vínculo, mantém a janela do MESMO serviço aberta
-    # (não depende da grade ter guardado a seleção) — assim o formulário
-    # para vincular o novo Programador já aparece na hora, sem precisar
-    # procurar o serviço certo em meio a outros pendentes.
-    if st.session_state.get("manter_aberto_apos_reverter") is not None:
-        st.session_state["servico_selecionado"] = st.session_state.pop("manter_aberto_apos_reverter")
+    # Depois de trocar ou excluir um vínculo, mantém a janela do MESMO
+    # serviço aberta (não depende da grade ter guardado a seleção) — assim
+    # o resultado da ação já aparece na hora, sem precisar procurar o
+    # serviço certo em meio a outros pendentes.
+    if st.session_state.get("manter_selecionado_apos_acao") is not None:
+        st.session_state["servico_selecionado"] = st.session_state.pop("manter_selecionado_apos_acao")
 
     if st.session_state["servico_selecionado"] is not None:
         id_sel = st.session_state["servico_selecionado"]
@@ -359,19 +359,34 @@ else:
                             database.vincular_programador(id_sel, programador_escolhido)
                             st.rerun()
                 else:
-                    col_cap, col_reverter = st.columns([4, 2])
-                    with col_cap:
-                        st.caption(
-                            f"Vinculado a **{servico['programador']}** em {servico.get('data_hora_vinculo') or ''}."
+                    st.caption(
+                        f"Vinculado a **{servico['programador']}** em {servico.get('data_hora_vinculo') or ''}."
+                    )
+                    col_troca_sel, col_troca_btn, col_excluir = st.columns([3, 2, 2])
+                    with col_troca_sel:
+                        novo_programador = st.selectbox(
+                            "Trocar para",
+                            options=nomes_programadores,
+                            key=f"trocar_sel_{id_sel}",
+                            label_visibility="collapsed",
                         )
-                    with col_reverter:
+                    with col_troca_btn:
                         if st.button(
-                            "🔁 Reverter vínculo (excluir/trocar)",
-                            key=f"reverter_vinculo_{id_sel}",
+                            "🔁 Trocar Programador",
+                            key=f"trocar_btn_{id_sel}",
+                            use_container_width=True,
+                        ):
+                            database.trocar_programador(id_sel, novo_programador)
+                            st.session_state["manter_selecionado_apos_acao"] = id_sel
+                            st.rerun()
+                    with col_excluir:
+                        if st.button(
+                            "❌ Excluir vínculo",
+                            key=f"excluir_vinculo_{id_sel}",
                             use_container_width=True,
                         ):
                             database.reverter_vinculo(id_sel)
-                            st.session_state["manter_aberto_apos_reverter"] = id_sel
+                            st.session_state["manter_selecionado_apos_acao"] = id_sel
                             st.rerun()
 
                 # Histórico de Comentários — mais recente primeiro, só o

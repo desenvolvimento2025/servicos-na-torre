@@ -374,6 +374,31 @@ def reverter_vinculo(id_atendimento):
         )
 
 
+def trocar_programador(id_atendimento, novo_programador):
+    """Troca o Programador responsável por um serviço que já está vinculado,
+    sem passar por PENDENTE: o STATUS_MONITOR continua 'ABERTO' o tempo
+    todo (não dispara o banner de 'aguardando Programador'), e
+    data_hora_vinculo não é alterada — a métrica de tempo de resposta do
+    primeiro atendimento não deve mudar só porque o responsável foi
+    trocado depois. Grava um log automático em Comentários com o nome
+    anterior e o novo."""
+    agora = _now_str()
+    with get_connection() as conn:
+        row = conn.execute(
+            "SELECT programador FROM servicos WHERE id_atendimento = ?",
+            (id_atendimento,),
+        ).fetchone()
+        programador_anterior = (row["programador"] if row else None) or "(sem nome)"
+        conn.execute(
+            "UPDATE servicos SET programador=?, atualizado_em=? WHERE id_atendimento=?",
+            (novo_programador, agora, id_atendimento),
+        )
+        add_comentario(
+            conn, id_atendimento, "Sistema", tipo="automatico",
+            texto=f"Programador alterado de {programador_anterior} para {novo_programador} em {agora}",
+        )
+
+
 def adicionar_comentario_manual(id_atendimento, autor, texto):
     with get_connection() as conn:
         add_comentario(conn, id_atendimento, autor, texto=texto, tipo="manual")
